@@ -1,4 +1,4 @@
 app_data/colorizedImages/
 app_data/tmp_sessions/
-
+.DS_Store
 !app_data/static/
