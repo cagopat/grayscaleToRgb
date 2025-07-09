@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Image Colorization</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>AI Image Colorization</h1>
+            <p>Transform grayscale images into vibrant color using GANs</p>
+        </div>
+
+        <div class="rate-limit-info">
+            <div class="rate-limit-counter" id="rateLimitCounter">5/5</div>
+            <p>Uploads remaining for this minute</p>
+        </div>
+
+        <div class="upload-section">
+            <div class="upload-zone" id="uploadZone">
+                <div class="upload-icon">🎨</div>
+                <div class="upload-text">Drop your grayscale images here</div>
+                <div class="upload-subtext">or click to browse files</div>
+                <button class="btn" onclick="document.getElementById('fileInput').click()">Choose Files</button>
+                <input type="file" id="fileInput" class="file-input" multiple accept="image/*">
+            </div>
+
+            <!-- Hidden validation fields for bot detection -->
+            <input type="text" class="hidden-validation" id="honeyPot" tabindex="-1">
+            <input type="hidden" id="browserFingerprint">
+            <input type="hidden" id="sessionToken">
+
+            <div class="limits-info">
+                <div class="limit-item">
+                    <div class="limit-number">5</div>
+                    <div>Max Images</div>
+                </div>
+                <div class="limit-item">
+                    <div class="limit-number">10MB</div>
+                    <div>Max Per Image</div>
+                </div>
+                <div class="limit-item">
+                    <div class="limit-number">5</div>
+                    <div>Per Minute</div>
+                </div>
+            </div>
+
+            <div id="messages"></div>
+
+            <div class="file-preview" id="filePreview"></div>
+
+            <div class="description-block" style="margin-top: 30px; text-align: center;">
+                <p>
+                    <br>
+                    <span style="font-size: 0.9rem; font-weight: bold;">
+                        This model performs best on clear, high-resolution grayscale images. If the uploaded image is noisy, low-contrast, or very small, the colorization result may not match expectations. (Blame the researchers, not me😞)
+                    </span>
+                </p>
+            </div>
+
+            <button class="btn process-btn" id="processBtn" disabled>
+                🔥 Colorize Images 
+            </button>
+
+            <div id="results" class="file-preview"></div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Processing your images...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Copyright footer -->
+    <footer class="app-footer">
+        <p>
+            Colorization powered by
+            <a href="https://github.com/piddnad/DDColor" target="_blank" rel="noopener">DDColor</a>
+            (© piddnad)
+        </p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
