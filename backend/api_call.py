@@ -29,7 +29,7 @@ class HFRemoteColorizer:
         self._async_client: Optional[httpx.AsyncClient] = None
         self._sync_client: Optional[httpx.Client] = None
 
-    # ---------- sync ----------
+
     def _get_sync(self) -> httpx.Client:
         if self._sync_client is None:
             self._sync_client = httpx.Client(
@@ -44,12 +44,11 @@ class HFRemoteColorizer:
             files = {"image": ("input.png", png, "image/png")}
             resp = self._get_sync().post(self.api_url, files=files)
             resp.raise_for_status()
-            return _decode_png(resp.content)  # <-- read binary content
+            return _decode_png(resp.content) 
         except Exception as e:
             print(f"[HFRemoteColorizer] sync error: {e}")
             return None
 
-    # ---------- async ----------
     async def _get_async(self) -> httpx.AsyncClient:
         if self._async_client is None:
             self._async_client = httpx.AsyncClient(
@@ -65,12 +64,11 @@ class HFRemoteColorizer:
             client = await self._get_async()
             resp = await client.post(self.api_url, files=files)
             resp.raise_for_status()
-            return _decode_png(resp.content)  # <-- read binary content
+            return _decode_png(resp.content)
         except Exception as e:
             print(f"[HFRemoteColorizer] async error: {e}")
             return None
 
-    # ---------- cleanup ----------
     def close(self):
         if self._sync_client is not None:
             self._sync_client.close()
