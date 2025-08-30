@@ -1,4 +1,4 @@
-# Grayscale → Colorizer
+# Grayscale → RGB
 
 FastAPI service with a lightweight frontend to colorize grayscale images.  
 Includes Redis-backed rate limiting, streaming uploads with size caps, Prometheus metrics, and per-session result browsing & downloads.
