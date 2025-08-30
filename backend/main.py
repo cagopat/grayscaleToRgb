@@ -23,11 +23,10 @@ from .api_call import HFRemoteColorizer
 from dotenv import load_dotenv
 load_dotenv()
 
-# ── configure logging ───────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ── constants & paths ───────────────────────────────────────────────────────
+
 CODE_DIR = Path(__file__).resolve().parent
 APP_DATA = Path("./app_data")
 TEMP_DIR = APP_DATA / "tmp_sessions"
@@ -36,7 +35,7 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / "frontend"
 RL_ALLOWED = Counter(
     "ratelimit_allowed_total",
     "Count of requests allowed by the rate limiter",
-    ["scope"],  # e.g. "upload_check", "predict_bin"
+    ["scope"], 
 )
 RL_BLOCKED = Counter(
     "ratelimit_blocked_total",
@@ -58,7 +57,7 @@ CHUNK_SIZE = 64 * 1024
 for d in (APP_DATA, TEMP_DIR, RESULTS_DIR, STATIC_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
-# ── async redis  ───────────────────────────────────────────────────
+
 REDIS_URL = os.getenv("REDIS_URL")
 
 if REDIS_URL:
@@ -79,13 +78,13 @@ if REDIS_URL:
 else:
     logger.info("REDIS_URL not set; rate limiter will fall back to in-memory")
 
-# ── global state ───────────────────────────────────────────────────────────
+
 ALLOWED_MIME_TYPES = {"image/png", "image/jpeg", "image/jpg", "image/webp"}
 upload_history: Dict[str, List[float]] = {}
 api_url=os.getenv("API_URL")
 colorizer = HFRemoteColorizer(api_url=api_url)
 
-# Threadpool sized to machine: up to 5x cores, capped at 32
+
 MAX_WORKERS = min(32, (os.cpu_count() or 1) * 5)
 sem=asyncio.Semaphore(MAX_WORKERS)
 executor: Optional[ThreadPoolExecutor] = None
@@ -133,7 +132,7 @@ async def _ensure_rl_script_loaded():
 def real_client_ip(request: Request) -> str:
     xff = request.headers.get("x-forwarded-for")
     ip = (xff.split(",")[0].strip() if xff else (request.client.host or "unknown"))
-    if ip.startswith("::ffff:"):  # IPv6-mapped IPv4
+    if ip.startswith("::ffff:"):  
         ip = ip.split(":")[-1]
     return ip
 
@@ -150,16 +149,16 @@ async def check_limits(r, key: str, inc: int = 1):
         raise HTTPException(503, "Rate limiter unavailable")
 
     now = time.time()
-    minute_bucket = int(now // RATE_LIMIT_WINDOW)  # 60s windows
-    day_bucket    = int(now // 86400)              # daily windows
+    minute_bucket = int(now // RATE_LIMIT_WINDOW)  
+    day_bucket    = int(now // 86400)            
 
     mkey = f"rl:{key}:m:{minute_bucket}"
     dkey = f"rl:{key}:d:{day_bucket}"
 
-    mttl = RATE_LIMIT_WINDOW * 2       # keep 2 windows (e.g., 120s)
-    dttl = 86400 + 600                 # 1 day + buffer
+    mttl = RATE_LIMIT_WINDOW * 2    
+    dttl = 86400 + 600               
 
-    # ensure script is loaded
+   
     await _ensure_rl_script_loaded()
 
     try:
@@ -254,7 +253,7 @@ async def _read_limited(upload: UploadFile, limit: int) -> bytes:
             break
         total += len(chunk)
         if total > limit:
-            # drain rest so the client connection is cleanly consumed
+            
             while await upload.read(CHUNK_SIZE):
                 pass
             raise HTTPException(status_code=413, detail=f"File too large (>{limit} bytes)")
@@ -265,7 +264,7 @@ async def _colorize_np_bgr(img_bgr: np.ndarray) -> np.ndarray:
     """Offload the blocking HF call to the threadpool."""
     loop = asyncio.get_running_loop()
     def _run():
-        out = colorizer.process(img_bgr)  # sync, may block
+        out = colorizer.process(img_bgr)  
         if out is None:
             raise RuntimeError("Colorizer returned None")
         return out
@@ -280,9 +279,7 @@ async def _encode_png(img_bgr: np.ndarray) -> bytes:
         return buf.tobytes()
     return await loop.run_in_executor(executor, _run)
 
-# ══════════════════════════════════════════════════════════════════════════════
-# API ROUTES
-# ══════════════════════════════════════════════════════════════════════════════
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global executor
@@ -460,7 +457,7 @@ async def cleanup_old_files(max_age_hours: int = 2):
         if d.is_dir() and d.stat().st_mtime < cutoff:
             shutil.rmtree(d, ignore_errors=True)
             cleaned += 1
-    # temp dirs
+  
     for d in TEMP_DIR.iterdir():
         if d.is_dir() and d.stat().st_mtime < cutoff:
             shutil.rmtree(d, ignore_errors=True)
@@ -506,9 +503,7 @@ async def predict_bin(request: Request, image: UploadFile = File(...)):
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MAIN
-# ══════════════════════════════════════════════════════════════════════════════
+
 
 if __name__ == "__main__":
     import uvicorn
