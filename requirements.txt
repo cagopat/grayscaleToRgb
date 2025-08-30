@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+httpx
+numpy
+pydantic
+python-multipart   
+python-dotenv
+opencv-python
+python-magic      
+prometheus-client
+prometheus-fastapi-instrumentator
+aiofiles            
+redis

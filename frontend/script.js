@@ -1,50 +1,54 @@
 class ImageColorizerApp {
     constructor() {
         this.selectedFiles = [];
-        this.maxFiles = 10;  // Now matches backend
-        this.maxFileSize = 10 * 1024 * 1024; // 10MB
-        this.rateLimit = 5;  // Now matches backend
-        this.rateLimitWindow = 60000; // 1 minute
+        this.maxFiles = 25;  
+        this.maxFileSize = 1024 * 1024; //
+        this.rateLimitWindow = 60000; 
         this.uploadCount = 0;
         this.lastResetTime = Date.now();
-        this.allResults = [];
-        // Backend URL - adjust this for your setup
-        this.backendUrl = 'http://127.0.0.1:8000'; // Local development
+        this.perRequestMax = 5; 
         
         this.initializeFingerprinting();
         this.initializeEventListeners();
         this.generateSessionToken();
         this.updateRateLimitDisplay();
-        
-        // Test backend connection on startup
         this.testBackendConnection();
+        this.init();
     }
+    async init() {
+    await this.loadConfig();           
+    await this.testBackendConnection();
+  }
+    
+    async loadConfig() {
+    const response = await fetch("/config"); 
+    const config = await response.json();
+    this.backendUrl = config.backendUrl;
+}
 
     async testBackendConnection() {
+        await new Promise(resolve => setTimeout(resolve, 2000));
         try {
             const response = await fetch(`${this.backendUrl}/health`);
             if (response.ok) {
                 const health = await response.json();
-                console.log('✅ Backend connected:', health);
-                this.showMessage('Backend connected successfully', 'success');
+                console.log(' Backend connected:', health);
+                
             } else {
                 throw new Error('Backend health check failed');
             }
         } catch (error) {
-            console.error('❌ Backend connection failed:', error);
+            console.error(' Backend connection failed:', error);
             this.showMessage('Warning: Backend connection failed. Please check if the server is running.', 'warning');
         }
     }
 
     initializeFingerprinting() {
-        // Generate browser fingerprint for abuse detection
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         ctx.textBaseline = 'top';
         ctx.font = '14px Arial';
         ctx.fillText('Browser fingerprint', 2, 2);
-        
-        // Use a simpler fingerprint if CryptoJS is not available
         let fingerprint;
         if (typeof CryptoJS !== 'undefined') {
             fingerprint = CryptoJS.SHA256(
@@ -55,7 +59,6 @@ class ImageColorizerApp {
                 canvas.toDataURL()
             ).toString();
         } else {
-            // Fallback without CryptoJS
             fingerprint = btoa(
                 navigator.userAgent +
                 navigator.language +
@@ -68,30 +71,25 @@ class ImageColorizerApp {
     }
 
     generateSessionToken() {
-        // Use crypto.randomUUID if available, otherwise fallback
-        let token;
-        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-            token = crypto.randomUUID();
-        } else {
-            // Fallback UUID generation
-            token = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                const r = Math.random() * 16 | 0;
-                const v = c == 'x' ? r : (r & 0x3 | 0x8);
-                return v.toString(16);
-            });
-        }
-        document.getElementById('sessionToken').value = token;
-    }
-
+  const k = 'colorizer:session';
+  let token = localStorage.getItem(k);
+  if (!token) {
+    token = (crypto?.randomUUID?.() ??
+      'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random()*16|0, v = c==='x' ? r : (r&0x3|0x8);
+        return v.toString(16);
+      }));
+    localStorage.setItem(k, token);
+  }
+  document.getElementById('sessionToken').value = token;
+}
     initializeEventListeners() {
         const uploadZone = document.getElementById('uploadZone');
         const fileInput = document.getElementById('fileInput');
         const processBtn = document.getElementById('processBtn');
 
-        // Flag to prevent multiple file dialogs
         this.isFileDialogOpen = false;
 
-        // Drag and drop
         uploadZone.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadZone.classList.add('dragover');
@@ -133,7 +131,6 @@ class ImageColorizerApp {
             this.processImages();
         });
 
-        // Prevent file drops on the entire page
         document.addEventListener('dragover', (e) => e.preventDefault());
         document.addEventListener('drop', (e) => e.preventDefault());
     }
@@ -145,23 +142,25 @@ class ImageColorizerApp {
             this.lastResetTime = now;
         }
 
-        const remaining = Math.max(0, this.rateLimit - this.uploadCount);
-        document.getElementById('rateLimitCounter').textContent = `${remaining}/${this.rateLimit}`;
+        const remaining = Math.max(0, this.perRequestMax - this.uploadCount);
+        document.getElementById('rateLimitCounter').textContent = `${remaining}/${this.perRequestMax}`;
     }
 
     async preUploadCheck(newFileCount) {
         try {
+            const fp = document.getElementById('browserFingerprint').value;
             const response = await fetch(`${this.backendUrl}/upload/check`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-Client-Fingerprint': fp,   
                 },
                 body: JSON.stringify({
                     currentFileCount: this.selectedFiles.length,
                     newFileCount: newFileCount,
                     totalFileCount: this.selectedFiles.length + newFileCount,
                     sessionToken: document.getElementById('sessionToken').value,
-                    fingerprint: document.getElementById('browserFingerprint').value
+                    fingerprint: fp
                 })
             });
             
@@ -193,7 +192,7 @@ class ImageColorizerApp {
         const errors = [];
         
         if (file.size > this.maxFileSize) {
-            errors.push(`File ${file.name} exceeds 10MB limit`);
+            errors.push(`File ${file.name} exceeds 1MB limit`);
         }
 
         if (!file.type.startsWith('image/')) {
@@ -247,7 +246,6 @@ class ImageColorizerApp {
     }
 
     async handleFiles(files) {
-        // Check honey pot for bot detection
         const honeyPot = document.getElementById('honeyPot');
         if (honeyPot && honeyPot.value) {
             this.showMessage('Security check failed', 'error');
@@ -257,12 +255,12 @@ class ImageColorizerApp {
         const fileArray = Array.from(files);
         
         this.updateRateLimitDisplay();
-        if (this.uploadCount + fileArray.length > this.rateLimit) {
+        if (this.uploadCount + fileArray.length > this.perRequestMax) {
             this.showMessage(`Rate limit would be exceeded. You can only upload ${this.rateLimit - this.uploadCount} more file(s).`, 'error');
             return;
         }
 
-        if (this.selectedFiles.length + fileArray.length > this.maxFiles) {
+        if (this.selectedFiles.length + fileArray.length > this.perRequestMax) {
             this.showMessage(`Cannot exceed ${this.maxFiles} files total`, 'error');
             return;
         }
@@ -315,14 +313,15 @@ class ImageColorizerApp {
     renderFilePreview() {
         const previewDiv = document.getElementById('filePreview');
         previewDiv.innerHTML = '';
-
         this.selectedFiles.forEach((file, index) => {
+            if (!file._previewUrl) file._previewUrl = URL.createObjectURL(file); 
+
             const fileItem = document.createElement('div');
             fileItem.className = 'file-item';
-            
+
             const img = document.createElement('img');
             img.className = 'file-image';
-            img.src = URL.createObjectURL(file);
+            img.src = file._previewUrl;     
             img.alt = file.name;
 
             const fileInfo = document.createElement('div');
@@ -351,20 +350,24 @@ class ImageColorizerApp {
     }
 
     removeFile(index) {
-        URL.revokeObjectURL(URL.createObjectURL(this.selectedFiles[index]));
+        const f = this.selectedFiles[index];
+        if (f && f._previewUrl) {
+            URL.revokeObjectURL(f._previewUrl);
+            delete f._previewUrl;
+        }
         this.selectedFiles.splice(index, 1);
         this.uploadCount = Math.max(0, this.uploadCount - 1);
         this.updateRateLimitDisplay();
         this.renderFilePreview();
         this.updateProcessButton();
-    }
+        }
 
     updateProcessButton() {
         const processBtn = document.getElementById('processBtn');
         processBtn.disabled = this.selectedFiles.length === 0;
         processBtn.textContent = this.selectedFiles.length > 0 
-            ? `🔥 Colorize ${this.selectedFiles.length} Image${this.selectedFiles.length > 1 ? 's' : ''}`
-            : '🔥 Colorize Images';
+            ? ` Colorize ${this.selectedFiles.length} Image${this.selectedFiles.length > 1 ? 's' : ''}`
+            : ' Colorize Images';
     }
 
     formatFileSize(bytes) {
@@ -376,68 +379,68 @@ class ImageColorizerApp {
     }
     
     async processImages() {
-        console.log("🚀 processImages invoked! selectedFiles:", this.selectedFiles);
-
         if (this.selectedFiles.length === 0) return;
 
         const loadingDiv = document.getElementById('loading');
         const processBtn = document.getElementById('processBtn');
-        
+        const fp = document.getElementById('browserFingerprint').value;
+        const token = document.getElementById('sessionToken').value;
+
+      
+        const chunks = [];
+        for (let i = 0; i < this.selectedFiles.length; i += this.perRequestMax) {
+            chunks.push(this.selectedFiles.slice(i, i + this.perRequestMax));
+        }
+
         loadingDiv.style.display = 'block';
         processBtn.disabled = true;
         processBtn.textContent = 'Processing...';
 
         try {
-            const formData = new FormData();
-            this.selectedFiles.forEach(file => {
-            formData.append("files", file);
-            });
-            // ▶️ in script.js, inside processImages(), right before fetch:
+            for (let i = 0; i < chunks.length; i++) {
+                const chunk = chunks[i];
+                const formData = new FormData();
+                chunk.forEach(f => formData.append('files', f));
+                formData.append('sessionToken', token);
+                formData.append('fingerprint', fp);
 
+                const resp = await fetch(`${this.backendUrl}/api/colorize`, {
+                    method: 'POST',
+                    headers: { 'X-Client-Fingerprint': fp },
+                    body: formData
+                });
 
-            formData.append('sessionToken', document.getElementById('sessionToken').value);
-            formData.append('fingerprint', document.getElementById('browserFingerprint').value);
+                if (resp.status === 429) {
+                    const retry = resp.headers.get('Retry-After');
+                    throw new Error(`Rate limit hit. Try again in ${retry ? `${retry}s` : 'a minute'}.`);
+                }
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({ detail: 'Unknown error' }));
+                    throw new Error(err.detail || `HTTP ${resp.status}`);
+                }
 
-            console.log('Sending request to:', `${this.backendUrl}/api/colorize`);
-                    console.log("🔍 FormData entries:");
-            for (let [key, value] of formData.entries()) {
-            console.log("   ", key, value);
+                const result = await resp.json();
+                this.showMessage(`Batch ${i + 1}/${chunks.length}: ${result.message}`, 'success');
             }
-            const response = await fetch(`${this.backendUrl}/api/colorize`, {
-                method: 'POST',
-                body: formData
-            });
 
-            console.log('Response status:', response.status);
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
-            }
-
-            const result = await response.json();
-            console.log('Processing result:', result);
-            
-            this.showMessage(result.message || 'Images processed successfully!', 'success');
-            
-            
+            // Refresh gallery once at the end
             await this.refreshResults();
-            // Reset the form
             this.selectedFiles = [];
             this.renderFilePreview();
             this.updateProcessButton();
-            
+
         } catch (error) {
             console.error('Processing error:', error);
             this.showMessage('Processing failed: ' + error.message, 'error');
         } finally {
             loadingDiv.style.display = 'none';
             processBtn.disabled = false;
-            processBtn.textContent = this.selectedFiles.length > 0 
-                ? `🔥 Colorize ${this.selectedFiles.length} Image${this.selectedFiles.length > 1 ? 's' : ''}`
-                : '🔥 Colorize Images';
+            processBtn.textContent = this.selectedFiles.length > 0
+                ? `Colorize ${this.selectedFiles.length} Image${this.selectedFiles.length > 1 ? 's' : ''}`
+                : ' Colorize Images';
         }
     }
+
     async refreshResults() {
         const token = document.getElementById('sessionToken').value;
         const resp  = await fetch(`${this.backendUrl}/api/results/${token}`);
@@ -446,62 +449,56 @@ class ImageColorizerApp {
             return;
         }
         const data = await resp.json();
-        // data.results is an array of { filename, url, size, created }
+      
         const urls = data.results.map(r => r.url);
-        console.log("🔄 refreshResults got URLs:", urls);
+        console.log(" refreshResults got URLs:", urls);
         this.displayResults(urls);
-        }
-
+    }
 
     displayResults(urls) {
-  // 1) grab the EXISTING container (we moved it into the HTML below)
-  const container = document.getElementById("results");
-  // 2) clear any old thumbnails
-  container.innerHTML = "";
+        const container = document.getElementById("results");
+        
+        container.innerHTML = "";
 
-  urls.forEach((relativeUrl, idx) => {
-    const fileName = relativeUrl.split("/").pop();
-    const fullUrl  = `${this.backendUrl}${relativeUrl}`;
+        urls.forEach((relativeUrl, idx) => {
+            const fileName = relativeUrl.split("/").pop();
+            const fullUrl  = `${this.backendUrl}${relativeUrl}`;
 
-    // 3) card wrapper using your upload‐preview class
-    const card = document.createElement("div");
-    card.className = "file-item";
+            const card = document.createElement("div");
+            card.className = "file-item";
 
-    // 4) image element, same class as your preview
-    const img = document.createElement("img");
-    img.className    = "file-image";
-    img.src          = fullUrl;
-    img.alt          = fileName;
-    img.style.objectFit   = "contain";     // letterbox inside
-    img.style.background   = "#102542";    // match card bg
-    card.appendChild(img);
+            const img = document.createElement("img");
+            img.className    = "file-image";
+            img.src          = fullUrl;
+            img.alt          = fileName;
+            img.style.objectFit   = "contain";  
+            img.style.background   = "#102542";   
+            card.appendChild(img);
 
-    // 5) info area: filename + download button
-    const info = document.createElement("div");
-    info.className = "file-info";
+            const info = document.createElement("div");
+            info.className = "file-info";
 
-    const nameDiv = document.createElement("div");
-    nameDiv.className = "file-name";
-    nameDiv.textContent = fileName;
-    info.appendChild(nameDiv);
+            const nameDiv = document.createElement("div");
+            nameDiv.className = "file-name";
+            nameDiv.textContent = fileName;
+            info.appendChild(nameDiv);
 
-    const dl = document.createElement("a");
-    dl.className    = "download-btn";
-    dl.href         = fullUrl;
-    dl.download     = fileName;
-    dl.textContent  = "⬇️ Download";
-    info.appendChild(dl);
+            const dl = document.createElement("a");
+            dl.className    = "download-btn";
+            dl.href         = fullUrl;
+            dl.download     = fileName;
+            dl.textContent  = "⬇️ Download";
+            info.appendChild(dl);
 
-    card.appendChild(info);
+            card.appendChild(info);
 
-    container.appendChild(card);
-  });
+            container.appendChild(card);
+        });
 
-  console.log("Colorized images displayed:", urls);
-}
+        console.log("Colorized images displayed:", urls);
+    }
 }
 
-// Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     new ImageColorizerApp();
 });
