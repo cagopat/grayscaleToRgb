@@ -1,4 +1,10 @@
 # Grayscale → RGB
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/2501ad5a-a175-492e-aae4-9a89a6e0eb33" alt="Grayscale" width="49%">
+  <img src="https://github.com/user-attachments/assets/9bcfaeff-aa69-4a33-969b-3cd1162f613b" alt="Colorized" width="49%">
+</p>
+
+
 
 FastAPI service with a lightweight frontend to colorize grayscale images.  
 Includes Redis-backed rate limiting, streaming uploads with size caps, Prometheus metrics, and per-session result browsing & downloads.
